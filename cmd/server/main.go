@@ -13,13 +13,14 @@ import (
 
 func main() {
 	app := fiber.New(fiber.Config{
-		AppName: "ArduSim API v1.0",
+		AppName:   "ArduSim API v1.0",
+		BodyLimit: 2 * 1024 * 1024,
 	})
 
 	// Middleware
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*", // For MVP. In production, restrict this.
+		AllowOrigins: "http://localhost:3000,http://127.0.0.1:3000",
 		AllowHeaders: "Origin, Content-Type, Accept",
 	}))
 
@@ -28,28 +29,16 @@ func main() {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 
-	// API Group
-	api := app.Group("/api")
-
-	// Project Routes (Mocked for MVP)
-	projects := api.Group("/projects")
-	projects.Get("/", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"projects": []interface{}{}})
-	})
-	projects.Post("/", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "created", "id": "mock-uuid"})
-	})
-
-	// AI Routes (Mocked for MVP)
-	ai := api.Group("/ai")
-	ai.Post("/chat", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"reply": "This is a mock AI response from the Go backend."})
-	})
+	dir := os.Getenv("PROJECT_DIR")
+	if dir == "" {
+		dir = "data/projects"
+	}
+	registerProjects(app, dir)
 
 	// Start Server
 	go func() {
 		log.Println("Starting backend server on port 8080...")
-		if err := app.Listen(":8080"); err != nil {
+		if err := app.Listen("127.0.0.1:8080"); err != nil {
 			log.Fatalf("Fiber failed to start: %v", err)
 		}
 	}()
