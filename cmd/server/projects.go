@@ -20,12 +20,13 @@ type component struct {
 	State    map[string]interface{} `json:"state"`
 }
 type wire struct {
-	ID                string `json:"id"`
-	SourceComponentID string `json:"sourceComponentId"`
-	SourcePinID       string `json:"sourcePinId"`
-	TargetComponentID string `json:"targetComponentId"`
-	TargetPinID       string `json:"targetPinId"`
-	Color             string `json:"color"`
+	Path              [][]float64 `json:"path,omitempty"`
+	ID                string      `json:"id"`
+	SourceComponentID string      `json:"sourceComponentId"`
+	SourcePinID       string      `json:"sourcePinId"`
+	TargetComponentID string      `json:"targetComponentId"`
+	TargetPinID       string      `json:"targetPinId"`
+	Color             string      `json:"color"`
 }
 type project struct {
 	Version    int         `json:"version"`
@@ -40,6 +41,17 @@ var hexColor = regexp.MustCompile(`^#[a-fA-F0-9]{6}$`)
 
 func pinValid(kind, pin string) bool {
 	switch kind {
+	case "esp32_wroom":
+		for _, n := range []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 34, 35, 36, 39} {
+			if pin == fmt.Sprint("GPIO", n) {
+				return true
+			}
+		}
+		for _, p := range []string{"EN", "3V3", "5V", "GND1", "GND2", "GND3"} {
+			if p == pin {
+				return true
+			}
+		}
 	case "arduino_uno":
 		for i := 0; i < 14; i++ {
 			if pin == fmt.Sprint("D", i) {
@@ -90,7 +102,7 @@ func validateProject(p project) error {
 			return fmt.Errorf("invalid component")
 		}
 		known := false
-		for _, test := range []string{"D0", "t0_0", "A", "1a", "W", "L"} {
+		for _, test := range []string{"GPIO0", "D0", "t0_0", "A", "1a", "W", "L"} {
 			if pinValid(c.TypeID, test) {
 				known = true
 			}
@@ -111,6 +123,19 @@ func validateProject(p project) error {
 		a, b := w.SourceComponentID+":"+w.SourcePinID, w.TargetComponentID+":"+w.TargetPinID
 		if !safeID.MatchString(w.ID) || wireIDs[w.ID] || !hexColor.MatchString(w.Color) || a == b || !pinValid(ids[w.SourceComponentID], w.SourcePinID) || !pinValid(ids[w.TargetComponentID], w.TargetPinID) || seen[a+"/"+b] || seen[b+"/"+a] {
 			return fmt.Errorf("invalid wire")
+		}
+		if len(w.Path) > 12 {
+			return fmt.Errorf("too many routing points")
+		}
+		for _, point := range w.Path {
+			if len(point) != 3 {
+				return fmt.Errorf("invalid routing point")
+			}
+			for _, v := range point {
+				if v > 10000 || v < -10000 {
+					return fmt.Errorf("invalid routing coordinate")
+				}
+			}
 		}
 		seen[a+"/"+b] = true
 		wireIDs[w.ID] = true
