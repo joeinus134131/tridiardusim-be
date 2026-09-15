@@ -1,17 +1,18 @@
-package main
+package api
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sync"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
-type component struct {
+type Component struct {
 	ID       string                 `json:"id"`
 	TypeID   string                 `json:"typeId"`
 	Name     string                 `json:"name"`
@@ -19,7 +20,8 @@ type component struct {
 	Rotation []float64              `json:"rotation"`
 	State    map[string]interface{} `json:"state"`
 }
-type wire struct {
+
+type Wire struct {
 	Path              [][]float64 `json:"path,omitempty"`
 	ID                string      `json:"id"`
 	SourceComponentID string      `json:"sourceComponentId"`
@@ -28,18 +30,19 @@ type wire struct {
 	TargetPinID       string      `json:"targetPinId"`
 	Color             string      `json:"color"`
 }
-type project struct {
+
+type Project struct {
 	Version    int         `json:"version"`
 	Name       string      `json:"name"`
 	Code       string      `json:"code"`
-	Components []component `json:"components"`
-	Wires      []wire      `json:"wires"`
+	Components []Component `json:"components"`
+	Wires      []Wire      `json:"wires"`
 }
 
 var safeID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 var hexColor = regexp.MustCompile(`^#[a-fA-F0-9]{6}$`)
 
-func pinValid(kind, pin string) bool {
+func PinValid(kind, pin string) bool {
 	switch kind {
 	case "esp32_wroom":
 		for _, n := range []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 34, 35, 36, 39} {
@@ -92,7 +95,8 @@ func pinValid(kind, pin string) bool {
 	}
 	return false
 }
-func validateProject(p project) error {
+
+func ValidateProject(p Project) error {
 	if p.Version != 1 || len(p.Name) == 0 || len(p.Name) > 128 || len(p.Code) > 64000 || len(p.Components) > 100 || len(p.Wires) > 500 || p.Components == nil || p.Wires == nil {
 		return fmt.Errorf("invalid project schema/limits")
 	}
@@ -103,7 +107,7 @@ func validateProject(p project) error {
 		}
 		known := false
 		for _, test := range []string{"GPIO0", "D0", "t0_0", "A", "1a", "W", "L"} {
-			if pinValid(c.TypeID, test) {
+			if PinValid(c.TypeID, test) {
 				known = true
 			}
 		}
@@ -121,7 +125,7 @@ func validateProject(p project) error {
 	wireIDs := map[string]bool{}
 	for _, w := range p.Wires {
 		a, b := w.SourceComponentID+":"+w.SourcePinID, w.TargetComponentID+":"+w.TargetPinID
-		if !safeID.MatchString(w.ID) || wireIDs[w.ID] || !hexColor.MatchString(w.Color) || a == b || !pinValid(ids[w.SourceComponentID], w.SourcePinID) || !pinValid(ids[w.TargetComponentID], w.TargetPinID) || seen[a+"/"+b] || seen[b+"/"+a] {
+		if !safeID.MatchString(w.ID) || wireIDs[w.ID] || !hexColor.MatchString(w.Color) || a == b || !PinValid(ids[w.SourceComponentID], w.SourcePinID) || !PinValid(ids[w.TargetComponentID], w.TargetPinID) || seen[a+"/"+b] || seen[b+"/"+a] {
 			return fmt.Errorf("invalid wire")
 		}
 		if len(w.Path) > 12 {
@@ -142,7 +146,8 @@ func validateProject(p project) error {
 	}
 	return nil
 }
-func registerProjects(app *fiber.App, dir string) {
+
+func RegisterProjects(app *fiber.App, dir string) {
 	var mu sync.Mutex
 	app.Get("/api/capabilities", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"projectVersion": 1, "execution": "browser-worker-subset", "physics": "quasi-static-dc", "maxComponents": 100, "maxWires": 500})
@@ -163,7 +168,7 @@ func registerProjects(app *fiber.App, dir string) {
 			if err != nil {
 				continue
 			}
-			var p project
+			var p Project
 			if json.Unmarshal(data, &p) == nil {
 				list = append(list, fiber.Map{"id": e.Name()[:len(e.Name())-5], "name": p.Name})
 			}
@@ -171,11 +176,11 @@ func registerProjects(app *fiber.App, dir string) {
 		return c.JSON(fiber.Map{"projects": list})
 	})
 	app.Post("/api/projects", func(c *fiber.Ctx) error {
-		var p project
+		var p Project
 		if err := c.BodyParser(&p); err != nil {
 			return fiber.NewError(400, "invalid JSON")
 		}
-		if err := validateProject(p); err != nil {
+		if err := ValidateProject(p); err != nil {
 			return fiber.NewError(400, err.Error())
 		}
 		mu.Lock()

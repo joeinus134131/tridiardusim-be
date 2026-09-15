@@ -1,17 +1,18 @@
-package main
+package api
 
 import (
 	"encoding/json"
-	"github.com/gofiber/fiber/v2"
 	"io"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func TestProjectRoundTrip(t *testing.T) {
 	app := fiber.New()
-	registerProjects(app, t.TempDir())
+	RegisterProjects(app, t.TempDir())
 	body := `{"version":1,"name":"uji","code":"void setup() {} void loop() {}","components":[{"id":"uno","typeId":"arduino_uno","name":"Uno","position":[0,0,0],"rotation":[0,0,0],"state":{}}],"wires":[]}`
 	req := httptest.NewRequest("POST", "/api/projects", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -31,7 +32,7 @@ func TestProjectRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	var p project
+	var p Project
 	if err = json.NewDecoder(res.Body).Decode(&p); err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +67,7 @@ func TestProjectRoundTrip(t *testing.T) {
 
 func TestESP32RoutingRoundTrip(t *testing.T) {
 	app := fiber.New()
-	registerProjects(app, t.TempDir())
+	RegisterProjects(app, t.TempDir())
 	body := `{"version":1,"name":"ESP32 route","code":"","components":[{"id":"esp","typeId":"esp32_wroom","name":"ESP32","position":[0,0.6,0],"rotation":[0,0,0],"state":{}}],"wires":[{"id":"w","sourceComponentId":"esp","sourcePinId":"GPIO25","targetComponentId":"esp","targetPinId":"GPIO26","color":"#a855f7","path":[[1,4,2],[3,4,2]]}]}`
 	req := httptest.NewRequest("POST", "/api/projects", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -85,13 +86,13 @@ func TestESP32RoutingRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	var p project
+	var p Project
 	json.NewDecoder(res.Body).Decode(&p)
 	if len(p.Wires) != 1 || len(p.Wires[0].Path) != 2 || p.Wires[0].Path[0][1] != 4 || p.Wires[0].Color != "#a855f7" {
 		t.Fatal("route lost")
 	}
 	p.Wires[0].Path = [][]float64{{1, 2}}
-	if validateProject(p) == nil {
+	if ValidateProject(p) == nil {
 		t.Fatal("invalid point accepted")
 	}
 }
