@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/gofiber/fiber/v2"
@@ -12,7 +14,30 @@ import (
 	"github.com/user/ardusim-backend/internal/api"
 )
 
+func loadDotEnv(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			k := strings.TrimSpace(parts[0])
+			v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+			if os.Getenv(k) == "" {
+				os.Setenv(k, v)
+			}
+		}
+	}
+}
+
 func main() {
+	loadDotEnv(".env")
+
 	app := fiber.New(fiber.Config{
 		AppName:   "ArduSim API v1.0",
 		BodyLimit: 2 * 1024 * 1024,
@@ -20,14 +45,20 @@ func main() {
 
 	// Middleware
 	app.Use(logger.New())
+
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		allowedOrigins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
+	}
+
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001",
-		AllowHeaders: "Origin, Content-Type, Accept",
+		AllowOrigins: allowedOrigins,
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
 
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(fiber.Map{"status": "ok", "service": "ArduSim API"})
 	})
 
 	dir := os.Getenv("PROJECT_DIR")
@@ -35,11 +66,22 @@ func main() {
 		dir = "data/projects"
 	}
 	api.RegisterProjects(app, dir)
+	api.RegisterHardware(app)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	host := os.Getenv("HOST")
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	addr := fmt.Sprintf("%s:%s", host, port)
 
 	// Start Server
 	go func() {
-		log.Println("Starting backend server on port 8080...")
-		if err := app.Listen("127.0.0.1:8080"); err != nil {
+		log.Printf("Starting backend server on %s (CORS allowed: %s)...", addr, allowedOrigins)
+		if err := app.Listen(addr); err != nil {
 			log.Fatalf("Fiber failed to start: %v", err)
 		}
 	}()

@@ -84,8 +84,8 @@ func PinValid(kind, pin string) bool {
 				}
 			}
 		}
-	case "led_red":
-		return pin == "A" || pin == "C"
+	case "led_red", "capacitor_universal":
+		return pin == "A" || pin == "C" || pin == "1" || pin == "2"
 	case "push_button":
 		return pin == "1a" || pin == "1b" || pin == "2a" || pin == "2b"
 	case "potentiometer":
