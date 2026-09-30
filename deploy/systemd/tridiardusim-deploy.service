@@ -1,0 +1,15 @@
+[Unit]
+Description=Deploy TridiarduSim backend from GitHub
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/tridiardusim-be
+ExecStart=/home/ubuntu/tridiardusim-be/deploy.sh
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

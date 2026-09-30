@@ -1,0 +1,11 @@
+[Unit]
+Description=Check GitHub for TridiarduSim backend updates
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Persistent=true
+Unit=tridiardusim-deploy.service
+
+[Install]
+WantedBy=timers.target
