@@ -16,8 +16,8 @@ if [[ "$current_revision" == "$target_revision" ]]; then
 fi
 
 git merge --ff-only origin/main
-docker compose build api
-docker compose up -d --no-deps api
+sudo docker compose build api
+sudo docker compose up -d --no-deps api
 
 for attempt in {1..20}; do
   if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
