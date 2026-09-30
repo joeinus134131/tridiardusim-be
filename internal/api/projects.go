@@ -86,6 +86,14 @@ func PinValid(kind, pin string) bool {
 		}
 	case "led_red", "capacitor_universal":
 		return pin == "A" || pin == "C" || pin == "1" || pin == "2"
+	case "oled_ssd1306", "lcd1602_i2c":
+		return pin == "GND" || pin == "VCC" || pin == "SCL" || pin == "SDA"
+	case "servo_sg90":
+		return pin == "GND" || pin == "VCC" || pin == "PWM"
+	case "dht11":
+		return pin == "GND" || pin == "VCC" || pin == "DATA"
+	case "hcsr04":
+		return pin == "GND" || pin == "VCC" || pin == "TRIG" || pin == "ECHO"
 	case "push_button":
 		return pin == "1a" || pin == "1b" || pin == "2a" || pin == "2b"
 	case "potentiometer":
@@ -106,13 +114,13 @@ func ValidateProject(p Project) error {
 			return fmt.Errorf("invalid component")
 		}
 		known := false
-		for _, test := range []string{"GPIO0", "D0", "t0_0", "A", "1a", "W", "L"} {
+		for _, test := range []string{"GPIO0", "D0", "t0_0", "A", "1a", "W", "L", "GND", "DATA", "TRIG", "PWM"} {
 			if PinValid(c.TypeID, test) {
 				known = true
 			}
 		}
 		if !known {
-			return fmt.Errorf("unknown component")
+			return fmt.Errorf("unknown component type: %s", c.TypeID)
 		}
 		for _, v := range append(c.Position, c.Rotation...) {
 			if v > 10000 || v < -10000 {
@@ -125,8 +133,14 @@ func ValidateProject(p Project) error {
 	wireIDs := map[string]bool{}
 	for _, w := range p.Wires {
 		a, b := w.SourceComponentID+":"+w.SourcePinID, w.TargetComponentID+":"+w.TargetPinID
-		if !safeID.MatchString(w.ID) || wireIDs[w.ID] || !hexColor.MatchString(w.Color) || a == b || !PinValid(ids[w.SourceComponentID], w.SourcePinID) || !PinValid(ids[w.TargetComponentID], w.TargetPinID) || seen[a+"/"+b] || seen[b+"/"+a] {
-			return fmt.Errorf("invalid wire")
+		if !safeID.MatchString(w.ID) || wireIDs[w.ID] || !hexColor.MatchString(w.Color) || a == b || seen[a+"/"+b] || seen[b+"/"+a] {
+			return fmt.Errorf("invalid wire: %s", w.ID)
+		}
+		if !PinValid(ids[w.SourceComponentID], w.SourcePinID) {
+			return fmt.Errorf("invalid source pin %s on component %s", w.SourcePinID, w.SourceComponentID)
+		}
+		if !PinValid(ids[w.TargetComponentID], w.TargetPinID) {
+			return fmt.Errorf("invalid target pin %s on component %s", w.TargetPinID, w.TargetComponentID)
 		}
 		if len(w.Path) > 12 {
 			return fmt.Errorf("too many routing points")

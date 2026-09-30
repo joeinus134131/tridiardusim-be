@@ -96,3 +96,20 @@ func TestESP32RoutingRoundTrip(t *testing.T) {
 		t.Fatal("invalid point accepted")
 	}
 }
+
+func TestHCSSR04ProjectRoundTrip(t *testing.T) {
+	app := fiber.New()
+	RegisterProjects(app, t.TempDir())
+	body := `{"version":1,"name":"hcsr04","code":"void setup() {} void loop() {}","components":[{"id":"uno","typeId":"arduino_uno","name":"Arduino Uno R3","position":[-7,0,0],"rotation":[0,0,0],"state":{}},{"id":"sonar","typeId":"hcsr04","name":"Sensor Ultrasonik HC-SR04","position":[6,0.6,0],"rotation":[0,0,0],"state":{"distance":25,"isPowered":false,"isTriggered":false}}],"wires":[{"id":"wire0","sourceComponentId":"uno","sourcePinId":"5V","targetComponentId":"sonar","targetPinId":"VCC","color":"#ef4444"},{"id":"wire1","sourceComponentId":"uno","sourcePinId":"GND1","targetComponentId":"sonar","targetPinId":"GND","color":"#1e293b"},{"id":"wire2","sourceComponentId":"uno","sourcePinId":"D9","targetComponentId":"sonar","targetPinId":"TRIG","color":"#eab308"},{"id":"wire3","sourceComponentId":"uno","sourcePinId":"D10","targetComponentId":"sonar","targetPinId":"ECHO","color":"#3b82f6"}]}`
+	req := httptest.NewRequest("POST", "/api/projects", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	res, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 201 {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("HC-SR04 save rejected: %s", b)
+	}
+}
